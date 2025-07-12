@@ -1,41 +1,34 @@
+# from kerykeion import Report, AstrologicalSubject, KerykeionChartSVG
+import airportsdata
+from geopy.geocoders import Nominatim
+import ephem
+import warnings
+warnings.filterwarnings('ignore')
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt # Visualization
-import seaborn as sns #Visualization
-plt.rcParams['figure.figsize'] = [8,5]
-plt.rcParams['font.size'] =14
-plt.rcParams['font.weight']= 'bold'
+import re
+import matplotlib.pyplot as plt 
+             
+import seaborn as sns
+
 import scipy 
 from scipy import stats 
 import statsmodels.api as sm
 from sklearn.linear_model import LogisticRegression, Ridge, Lasso, LinearRegression
-from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.model_selection import train_test_split, StratifiedKFold,GridSearchCV, cross_validate, GroupKFold, RandomizedSearchCV, validation_curve, learning_curve
 from sklearn.metrics import confusion_matrix, classification_report, roc_auc_score, roc_curve, accuracy_score, auc
 import statsmodels.formula.api as smf
 import math
-from sklearn.model_selection import GridSearchCV, cross_validate, GroupKFold
-import warnings
-warnings.filterwarnings('ignore')
-plt.rcParams['figure.figsize'] = [8,5]
-plt.rcParams['font.size'] =14
-plt.rcParams['font.weight']= 'bold'
-
-from sklearn.model_selection import train_test_split, StratifiedKFold
-from sklearn.metrics import confusion_matrix, classification_report, roc_auc_score, roc_curve, accuracy_score, auc
-import statsmodels.formula.api as smf
-import math
-import warnings
-from sklearn.model_selection import train_test_split
-warnings.filterwarnings('ignore')
-
-from sklearn.model_selection import RandomizedSearchCV, validation_curve
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 import shap 
 from shap import TreeExplainer, Explanation
 from shap.plots import waterfall
-from sklearn.model_selection import learning_curve
-
-
+import requests
+from   datetime import datetime, timedelta,time
+import matplotlib.dates as mdates
+import statsmodels.api as sm
+import pytz
 from xgboost import XGBClassifier
 
 from sklearn import preprocessing
@@ -57,44 +50,28 @@ def optimal_number_of_clusters(data):
             distances.append(numerator/denominator)
         n_clusters = distances.index(max(distances)) + 2
         plt.plot(range(1, 20), cost, "--o")
-        plt.plot(n_clusters, cost[n_clusters-1], "o", color="red")
-        plt.xlabel("Number of Clusters")
-        plt.ylabel("Squared Error")
+        plt.plot(n_clusters, cost(n_clusters-1), "o", color="red")
+        plt.xlabel("#Number of Clusters")
+        plt.ylabel("#Squared Error")
         plt.show()
         return n_clusters
 import pickle
 from sklearn.cluster import KMeans, DBSCAN
 from mpl_toolkits import mplot3d
 from matplotlib import cm
-# Progress Bar
 import tqdm as tqdm
-
-
-
 import tensorflow as tf 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt # Visualization
-import seaborn as sns #Visualization
-plt.rcParams['figure.figsize'] = [8,5]
-plt.rcParams['font.size'] =14
-plt.rcParams['font.weight']= 'bold'
+
 import scipy 
-from scipy import stats 
-from sklearn.linear_model import LinearRegression
-import statsmodels.api as sm
 from keras.wrappers.scikit_learn import KerasClassifier 
-from sklearn.model_selection import GridSearchCV 
-from sklearn.preprocessing import LabelEncoder 
-from sklearn.preprocessing import StandardScaler 
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 import mplfinance as mpf
-import datetime
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import yfinance as yf
 from pandas_ta.momentum import rsi
-from sklearn.linear_model import LinearRegression
+
 
 def build_clf(unit): 
   # creating the layers of the NN 
@@ -143,7 +120,6 @@ def calculate_scorecard(d1, char):
     d3["WoE"] = round(np.log(d3["% Good"] / d3["% Bad"]), 2)
     iv = (d3["% Good"] - d3["% Bad"]) * d3["WoE"] / 100
     d4 = d3.sort_index().drop(columns=["min"], axis=1)
-
     return d4, iv
 
 def featureMonotonicBinning(Y, X, char):
@@ -196,131 +172,180 @@ def featureMonotonicBinning(Y, X, char):
         d3["Not Robust"] = np.select(condition, [1], 0)
         criteria = d3["Not Robust"].sum()
         d3 = d3.reset_index()
-    d3 = d3.drop(columns=["Not Robust"])
     infValue = round(iv.sum(),3)
-
-    ax1 = d3.plot.bar(x='Value', y='WoE', rot=0)
-    ax1.legend("")
-    ax1.tick_params(axis='both', which='major', labelsize=9)
-    ax1.set_title("Train Sample - "+char+" WoE - Inf. Value: " + str(infValue), fontsize=10)
-    ax1.set_xlabel(char, fontsize = 10)
-    ax1.set_ylabel("Weight of Evidence", fontsize = 10)
-    display(d3)
-    return d3, iv, infValue
-
-def featureMonotonicBinning(Y, X, char):
-    r = 0
-    bad_flag = 0
-    n = 20
-    while np.abs(r) != 1 and bad_flag == 0:
-        d1 = pd.DataFrame({"X": X, "Y": Y})
-        d1["Value"], bins = pd.qcut(d1["X"], n, duplicates="drop", retbins=True, precision=3)
-        if len(bins) == 2:
-            bins = bins.tolist()
-            bins.insert(0, float("-inf"))
-            bins.append(float("+inf"))
-            d1["Value"] = pd.cut(d1["X"], bins=bins, precision=3, include_lowest=True)
-        d2 = d1.groupby("Value", as_index=True)
-        r,p = stats.spearmanr(d2.mean().X, d2.mean().Y)
-        d3, iv = calculate_scorecard(d1, "Value")
-        d3.dropna(inplace=True)
-        
-        if len(d3) < 3:
-            bad_flag = 1
-        n = n-1
-       
-    pctThresh, badThresh, goodThresh = calculate_thresholds(d3["# Total"].sum(),d3["# Bad"].sum(),d3["# Good"].sum())
-    condition = [(d3["% Total"] < pctThresh*100) | (d3["% Bad"] < badThresh*100) | (d3["% Good"] < goodThresh*100)]
-    d3["Not Robust"] = np.select(condition, [1], 0)
-    criteria = d3["Not Robust"].sum()
-    d3 = d3.reset_index()
-    while criteria > 0:
-        i = d3[d3["Not Robust"] == 1].index[0]
-        #if first row -> merge two first categories
-        if i == 0:
-            bins = np.delete(bins, 1)
-        # if last row -> merge two last categories
-        elif i == (len(d3) - 1):
-            bins = np.delete(bins, len(d3)-1)
-        else:
-            # if number of samples greater in former -> merge with latter
-            if (d3.at[i-1 , "# Total"] > d3.at[i+1 , "# Total"]):
-                bins = np.delete(bins, i+1)
-            # if number of samples greater in latter -> merge with former
-            else:
-                bins = np.delete(bins, i)        
-        d1 = pd.DataFrame({"X": X, "Y": Y, "Value": pd.cut(X, bins, precision=3, include_lowest=True)})
-        d3, iv = calculate_scorecard(d1, "Value")
-        condition = [
-            (d3["% Total"] < pctThresh*100) | 
-            (d3["% Bad"] < badThresh*100) | 
-            (d3["% Good"] < goodThresh*100) ]
-        d3["Not Robust"] = np.select(condition, [1], 0)
-        criteria = d3["Not Robust"].sum()
-        d3 = d3.reset_index()
     d3 = d3.drop(columns=["Not Robust"])
-    infValue = round(iv.sum(),3)
-    display(d3)
-    ax1 = d3.plot.bar(x='Value', y='WoE', rot=0)
-    ax1.legend("")
-    ax1.tick_params(axis='both', which='major', labelsize=9)
-    ax1.set_title("Train Sample - "+char+" WoE - Inf. Value: " + str(infValue), fontsize=10)
-    ax1.set_xlabel(char, fontsize = 10)
-    ax1.set_ylabel("Weight of Evidence", fontsize = 10)
     return d3, iv, infValue
+  
+def get_RSI(df, column, time_window):
+    """Return the RSI indicator for the specified time window."""
+    diff = df[column].diff(1)
+
+    # This preservers dimensions off diff values.
+    up_chg = 0 * diff
+    down_chg = 0 * diff
+
+    # Up change is equal to the positive difference, otherwise equal to zero.
+    up_chg[diff > 0] = diff[diff > 0]
+
+    # Down change is equal to negative deifference, otherwise equal to zero.
+    down_chg[diff < 0] = diff[diff < 0]
+
+    # We set com = time_window-1 so we get decay alpha=1/time_window.
+    up_chg_avg = up_chg.ewm(com=time_window - 1,
+                            min_periods=time_window).mean()
+    down_chg_avg = down_chg.ewm(com=time_window - 1,
+                                min_periods=time_window).mean()
+
+    RS = abs(up_chg_avg / down_chg_avg)
+    df['RSI'] = 100 - 100 / (1 + RS)
+    # df = df[['RSI']]
+    return df
 
 
+from pandas_ta.momentum import rsi
+from pandas_ta.momentum import willr
 
-def fMb(Y, X, char):
-    r = 0
-    bad_flag = 0
-    n = 20
-    while np.abs(r) != 1 and bad_flag == 0:
-        d1 = pd.DataFrame({"X": X, "Y": Y})
-        d1["Value"], bins = pd.qcut(d1["X"], n, duplicates="drop", retbins=True, precision=3)
-        if len(bins) == 2:
-            bins = bins.tolist()
-            bins.insert(0, float("-inf"))
-            bins.append(float("+inf"))
-            d1["Value"] = pd.cut(d1["X"], bins=bins, precision=3, include_lowest=True)
-        d2 = d1.groupby("Value", as_index=True)
-        r,p = stats.spearmanr(d2.mean().X, d2.mean().Y)
-        d3, iv = calculate_scorecard(d1, "Value")
-        d3.dropna(inplace=True)
-        
-        if len(d3) < 3:
-            bad_flag = 1
-        n = n-1
-       
-    pctThresh, badThresh, goodThresh = calculate_thresholds(d3["# Total"].sum(),d3["# Bad"].sum(),d3["# Good"].sum())
-    condition = [(d3["% Total"] < pctThresh*100) | (d3["% Bad"] < badThresh*100) | (d3["% Good"] < goodThresh*100)]
-    d3["Not Robust"] = np.select(condition, [1], 0)
-    criteria = d3["Not Robust"].sum()
-    d3 = d3.reset_index()
-    while criteria > 0:
-        i = d3[d3["Not Robust"] == 1].index[0]
-        #if first row -> merge two first categories
-        if i == 0:
-            bins = np.delete(bins, 1)
-        # if last row -> merge two last categories
-        elif i == (len(d3) - 1):
-            bins = np.delete(bins, len(d3)-1)
-        else:
-            # if number of samples greater in former -> merge with latter
-            if (d3.at[i-1 , "# Total"] > d3.at[i+1 , "# Total"]):
-                bins = np.delete(bins, i+1)
-            # if number of samples greater in latter -> merge with former
-            else:
-                bins = np.delete(bins, i)        
-        d1 = pd.DataFrame({"X": X, "Y": Y, "Value": pd.cut(X, bins, precision=3, include_lowest=True)})
-        d3, iv = calculate_scorecard(d1, "Value")
-        condition = [
-            (d3["% Total"] < pctThresh*100) | 
-            (d3["% Bad"] < badThresh*100) | 
-            (d3["% Good"] < goodThresh*100) ]
-        d3["Not Robust"] = np.select(condition, [1], 0)
-        criteria = d3["Not Robust"].sum()
-        d3 = d3.reset_index()
-    d3 = d3.drop(columns=["Not Robust"])
-    infValue = round(iv.sum(),3)
-    return d3, iv, infValue
+from termcolor import colored as cl
+
+
+plt.style.use('ggplot')
+plt.rcParams["figure.figsize"] = (12,6)
+
+import re
+def distance(x,y):
+    if(x > y):
+        z = 360 - (abs(x - y)) 
+    else:
+        z = abs(x - y)
+    return z
+
+def deg_to_rad(dr):
+    return (dr*math.pi)/360
+
+def get_price(ticker, start_date, end_date):
+    """Return a DataFrame with price information (open, high, low, close, adjusted close, and volume) for the ticker between the specified dates."""
+    df = yf.download(ticker, start_date, end_date, progress=False)
+    df.reset_index(inplace=True)
+
+    return df# 
+
+def get_closed_dates(df):
+    """Return a list containing all dates on which the stock market was closed."""
+    # Create a dataframe that contains all dates from the start until today.
+    timeline = pd.date_range(start=df['Date'].iloc[0], end=df['Date'].iloc[-1])
+
+    # Create a list of the dates existing in the dataframe.
+    df_dates = [day.strftime('%Y-%m-%d') for day in pd.to_datetime(df['Date'])]
+
+    # Finally, determine which dates from the 'timeline' do not exist in our dataframe.
+    closed_dates = [
+        day for day in timeline.strftime('%Y-%m-%d').tolist()
+        if not day in df_dates
+    ]
+
+    return closed_dates
+
+
+from numpy import unique
+import investpy
+import os
+
+from pandas_ta.momentum import rsi
+from pandas_ta.volatility import atr
+
+
+from stock_indicators import indicators
+import pandas as pd
+import numpy as np
+import ta
+
+import os
+import yfinance as yf
+
+def higherRSI(nq, rsiLevel):
+
+    xx = (100/(100-rsiLevel)-1)
+    df = nq[['descences']]
+    df.loc[len(df)] = 0
+
+    df['avg_descences'] = df['descences'].ewm(com=time_window - 1,
+                            min_periods=time_window).mean()
+    avg_asc = (-1*df['avg_descences'].iloc[-1])*xx
+    avg_desc = (df['avg_descences'].iloc[-1])
+    RSTest = abs(avg_asc / avg_desc)
+    RSITest = (100 - (100/(1+RSTest)))
+    prevEMA = nq['avg_advances'].iloc[-1]
+
+    com = time_window - 1
+    a = 1/(1+com) 
+    latestValue = (avg_asc - ((1-a)*prevEMA)) / a
+
+    targetClose = nq['Close'].iloc[-1]+latestValue
+
+    d = nq[['Close']]
+    d.loc[len(d)] = targetClose
+    get_RSI(d,'Close',time_window)
+    checkCorrect = round(d['RSI'].iloc[-1],1)
+    print(targetClose)
+    return targetClose
+
+    #if(checkCorrect == rsiLevel):
+    #    print("RSI("+str(time_window)+"): "+str(rsiLevel)+" - Target Price: ",str(targetClose)+" -> OK")
+    # else:
+    #     print("")
+
+def lowerRSI(nq, rsiLevel):
+
+    xx =(100/(100-rsiLevel)-1)
+    df = nq[['advances']]
+    df.loc[len(df)] = 0
+    df['avg_advances'] = df['advances'].ewm(com=time_window - 1,
+                            min_periods=time_window).mean()
+    avg_asc = df['avg_advances'].iloc[-1]
+    avg_desc = -1*(avg_asc/xx)
+    prevEMA = nq['avg_descences'].iloc[-1]
+    com = time_window - 1
+    a = 1/(1+com) 
+    latestValue = (avg_desc - (1-a)*prevEMA) / a
+    targetClose = nq['Close'].iloc[-1]+latestValue
+
+    d = nq[['Close']]
+    d.loc[len(d)] = targetClose
+    get_RSI(d,'Close',time_window)
+    checkCorrect = round(d['RSI'].iloc[-1],1)
+    print(targetClose)
+    return targetClose
+
+    # if(checkCorrect == rsiLevel):
+        # print("RSI("+str(time_window)+"): "+str(rsiLevel)+" - Target Price: ",str(targetClose)+" -> OK")
+    # else:
+    #     print("")
+
+import time
+
+from trading_ig import IGService, IGStreamService
+from trading_ig.config import config
+from trading_ig.lightstreamer import Subscription
+from trading_ig.rest import IGService, ApiExceededException
+from tenacity import Retrying, wait_exponential, retry_if_exception_type
+from datetime import date
+
+retryer = Retrying(wait=wait_exponential(),
+                   retry=retry_if_exception_type(ApiExceededException))
+
+from datetime import datetime
+import MetaTrader5 as mt5
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+from pprint import pprint
+
+from datetime import datetime
+import pytz
+from IPython.display import  clear_output
+
+from scipy import stats, signal
+import plotly.express as px
+import plotly.graph_objects as go
+import seaborn as sns
+from sklearn import mixture as mix
